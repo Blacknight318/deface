@@ -20,38 +20,38 @@ def ensure_rgb(img: np.ndarray) -> np.ndarray:
 
 class CenterFace:
     def __init__(self, onnx_path=None, in_shape=None, backend='auto'):
-    self.in_shape = in_shape
-    self.onnx_input_name = 'input.1'
-    self.onnx_output_names = ['537', '538', '539', '540']
+        self.in_shape = in_shape
+        self.onnx_input_name = 'input.1'
+        self.onnx_output_names = ['537', '538', '539', '540']
 
-    if onnx_path is None:
-        onnx_path = default_onnx_path
+        if onnx_path is None:
+            onnx_path = default_onnx_path
 
-    if backend == 'auto':
-        try:
+        if backend == 'auto':
+            try:
+                import onnx
+                import onnxruntime
+                backend = 'onnxrt'
+            except:
+                backend = 'opencv'
+        self.backend = backend
+
+        if self.backend == 'opencv':
+            self.net = cv2.dnn.readNetFromONNX(onnx_path)
+        elif self.backend == 'onnxrt_openvino':
             import onnx
             import onnxruntime
-            backend = 'onnxrt'
-        except:
-            backend = 'opencv'
-    self.backend = backend
 
-    if self.backend == 'opencv':
-        self.net = cv2.dnn.readNetFromONNX(onnx_path)
-    elif self.backend == 'onnxrt_openvino':
-        import onnx
-        import onnxruntime
+            onnxruntime.set_default_logger_severity(3)
 
-        onnxruntime.set_default_logger_severity(3)
-
-        static_model = onnx.load(onnx_path)
-        dyn_model = self.dynamicize_shapes(static_model)
-        self.sess = onnxruntime.InferenceSession(dyn_model.SerializeToString(), providers=['OpenVINOExecutionProvider'])
-    elif self.backend == 'onnxrt':
-        import onnxruntime
-        self.sess = onnxruntime.InferenceSession(onnx_path)
-    else:
-        raise ValueError(f"Invalid backend: {backend}")
+            static_model = onnx.load(onnx_path)
+            dyn_model = self.dynamicize_shapes(static_model)
+            self.sess = onnxruntime.InferenceSession(dyn_model.SerializeToString(), providers=['OpenVINOExecutionProvider'])
+        elif self.backend == 'onnxrt':
+            import onnxruntime
+            self.sess = onnxruntime.InferenceSession(onnx_path)
+        else:
+            raise ValueError(f"Invalid backend: {backend}")
 
     @staticmethod
     def dynamicize_shapes(static_model):
