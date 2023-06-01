@@ -1,6 +1,5 @@
 import datetime
 import os
-
 import numpy as np
 import cv2
 
@@ -16,7 +15,6 @@ def ensure_rgb(img: np.ndarray) -> np.ndarray:
     elif img.shape[2] == 4:  # 4-channel RGBA -> RGB
         img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
     return img
-
 
 class CenterFace:
     def __init__(self, onnx_path=None, in_shape=None, backend='auto'):
@@ -53,7 +51,7 @@ class CenterFace:
         else:
             raise ValueError(f"Invalid backend: {backend}")
 
-    @staticmethod
+@staticmethod
 def dynamicize_shapes(static_model):
     from onnx.tools.update_model_dims import update_inputs_outputs_dims
 
