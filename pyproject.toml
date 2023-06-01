@@ -27,6 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gpu = ["onnxruntime-gpu"]
+openvino = ["onnxruntime-openvino"]
 
 [project.scripts]
 deface = "deface.deface:main"
@@ -44,4 +45,4 @@ write_to = "deface/_version.py"
 line-length = 120
 
 [project.urls]
-repository = "https://github.com/ORB-HD/deface"
+repository = "https://github.com/Blacknight318/deface"
