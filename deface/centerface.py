@@ -21,9 +21,8 @@ def ensure_rgb(img: np.ndarray) -> np.ndarray:
 
 class CenterFace:
     def __init__(self, onnx_path=None, in_shape=None, backend='auto'):
+            
         self.in_shape = in_shape
-        self.backend = backend
-        self.dynamicize_shapes = True
         self.onnx_input_name = 'input.1'
         self.onnx_output_names = ['537', '538', '539', '540']
 
@@ -32,39 +31,21 @@ class CenterFace:
 
         if backend == 'auto':
             try:
-                if USE_OPENVINO:
-                    import openvino.inference_engine as ie
-                    import onnx
-
-                    ie_core = ie.IECore()
-                    self.net = ie_core.read_network(model=onnx_path)
-                    self.exec_net = ie_core.load_network(network=self.net, device_name="GPU")
-                else:
-                    import onnx
-                    import onnxruntime
-                    backend = 'onnxrt'
+                import onnx
+                import onnxruntime
+                backend = 'onnxrt'
             except:
-                # TODO: Warn when using a --verbose flag
-                # print('Failed to import onnx, onnxruntime, or openvino. Falling back to slower OpenCV backend.')
                 backend = 'opencv'
         self.backend = backend
-
         if self.backend == 'opencv':
             self.net = cv2.dnn.readNetFromONNX(onnx_path)
         elif self.backend == 'onnxrt':
             import onnx
             import onnxruntime
-
-            # Silence warnings about unnecessary bn initializers
-            onnxruntime.set_default_logger_severity(3)
-
-            static_model = onnx.load(onnx_path)
-            dyn_model = self.dynamicize_shapes(static_model)
-            self.sess = onnxruntime.InferenceSession(dyn_model.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-
-            preferred_provider = self.sess.get_providers()[0]
-            preferred_device = 'GPU' if preferred_provider.startswith('CUDA') else 'CPU'
-            # print(f'Running on {preferred_device}.')
+            onnx_model = onnx.load(onnx_path)
+            self.sess = onnxruntime.InferenceSession(onnx_path)
+        else:
+            raise RuntimeError(f'Unknown backend {self.backend}')
 
     def __call__(self, img, threshold=0.5):
         img = ensure_rgb(img)
