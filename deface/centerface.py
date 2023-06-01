@@ -4,6 +4,7 @@ import os
 import numpy as np
 import cv2
 
+USE_OPENVINO = False  # Set this flag to True to use OpenVINO
 
 # Find file relative to the location of this code files
 default_onnx_path = f'{os.path.dirname(__file__)}/centerface.onnx'
@@ -29,15 +30,22 @@ class CenterFace:
 
         if backend == 'auto':
             try:
-                import onnx
-                import onnxruntime
-                backend = 'onnxrt'
+                if USE_OPENVINO:
+                    import openvino.inference_engine as ie
+                    import onnx
+
+                    ie_core = ie.IECore()
+                    self.net = ie_core.read_network(model=onnx_path)
+                    self.exec_net = ie_core.load_network(network=self.net, device_name="GPU")
+                else:
+                    import onnx
+                    import onnxruntime
+                    backend = 'onnxrt'
             except:
                 # TODO: Warn when using a --verbose flag
-                # print('Failed to import onnx or onnxruntime. Falling back to slower OpenCV backend.')
+                # print('Failed to import onnx, onnxruntime, or openvino. Falling back to slower OpenCV backend.')
                 backend = 'opencv'
         self.backend = backend
-
 
         if self.backend == 'opencv':
             self.net = cv2.dnn.readNetFromONNX(onnx_path)
@@ -56,29 +64,6 @@ class CenterFace:
             preferred_device = 'GPU' if preferred_provider.startswith('CUDA') else 'CPU'
             # print(f'Running on {preferred_device}.')
 
-    @staticmethod
-    def dynamicize_shapes(static_model):
-        from onnx.tools.update_model_dims import update_inputs_outputs_dims
-
-        input_dims, output_dims = {}, {}
-        for node in static_model.graph.input:
-            dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
-            input_dims[node.name] = dims
-        for node in static_model.graph.output:
-            dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
-            output_dims[node.name] = dims
-        input_dims.update({
-            'input.1': ['B', 3, 'H', 'W']  # RGB input image
-        })
-        output_dims.update({
-            '537': ['B', 1, 'h', 'w'],  # heatmap
-            '538': ['B', 2, 'h', 'w'],  # scale
-            '539': ['B', 2, 'h', 'w'],  # offset
-            '540': ['B', 10, 'h', 'w']  # landmarks
-        })
-        dyn_model = update_inputs_outputs_dims(static_model, input_dims, output_dims)
-        return dyn_model
-
     def __call__(self, img, threshold=0.5):
         img = ensure_rgb(img)
         self.orig_shape = img.shape[:2]
@@ -96,6 +81,12 @@ class CenterFace:
             heatmap, scale, offset, lms = self.net.forward(self.onnx_output_names)
         elif self.backend == 'onnxrt':
             heatmap, scale, offset, lms = self.sess.run(self.onnx_output_names, {self.onnx_input_name: blob})
+        elif self.backend == 'openvino':
+            input_blob_name = next(iter(self.net.input_info))
+            output_blob_name = next(iter(self.net.outputs))
+            self.exec_net.infer(inputs={input_blob_name: blob})
+            output = self.exec_net.requests[0].output_blobs[output_blob_name].buffer
+            heatmap, scale, offset, lms = [output[i] for i in range(len(self.onnx_output_names))]
         else:
             raise RuntimeError(f'Unknown backend {self.backend}')
         dets, lms = self.decode(heatmap, scale, offset, lms, (self.h_new, self.w_new), threshold=threshold)
