@@ -22,6 +22,8 @@ def ensure_rgb(img: np.ndarray) -> np.ndarray:
 class CenterFace:
     def __init__(self, onnx_path=None, in_shape=None, backend='auto'):
         self.in_shape = in_shape
+        self.backend = backend
+        self.dynamicize_shapes = True
         self.onnx_input_name = 'input.1'
         self.onnx_output_names = ['537', '538', '539', '540']
 
