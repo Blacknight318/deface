@@ -1,5 +1,6 @@
 import datetime
 import os
+
 import numpy as np
 import cv2
 
@@ -32,25 +33,28 @@ class CenterFace:
                 import onnxruntime
                 backend = 'onnxrt'
             except:
+                # TODO: Warn when using a --verbose flag
+                # print('Failed to import onnx or onnxruntime. Falling back to slower OpenCV backend.')
                 backend = 'opencv'
         self.backend = backend
 
+
         if self.backend == 'opencv':
             self.net = cv2.dnn.readNetFromONNX(onnx_path)
-        elif self.backend == 'onnxrt_openvino':
+        elif self.backend == 'onnxrt':
             import onnx
             import onnxruntime
 
+            # Silence warnings about unnecessary bn initializers
             onnxruntime.set_default_logger_severity(3)
 
             static_model = onnx.load(onnx_path)
             dyn_model = self.dynamicize_shapes(static_model)
-            self.sess = onnxruntime.InferenceSession(dyn_model.SerializeToString(), providers=['OpenVINOExecutionProvider'])
-        elif self.backend == 'onnxrt':
-            import onnxruntime
-            self.sess = onnxruntime.InferenceSession(onnx_path)
-        else:
-            raise ValueError(f"Invalid backend: {backend}")
+            self.sess = onnxruntime.InferenceSession(dyn_model.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+
+            preferred_provider = self.sess.get_providers()[0]
+            preferred_device = 'GPU' if preferred_provider.startswith('CUDA') else 'CPU'
+            # print(f'Running on {preferred_device}.')
 
     @staticmethod
     def dynamicize_shapes(static_model):
@@ -64,7 +68,7 @@ class CenterFace:
             dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
             output_dims[node.name] = dims
         input_dims.update({
-            'input.1': ['B', 3, 736, 1280]  # RGB input image with fixed dimensions
+            'input.1': ['B', 3, 'H', 'W']  # RGB input image
         })
         output_dims.update({
             '537': ['B', 1, 'h', 'w'],  # heatmap
@@ -176,3 +180,4 @@ class CenterFace:
                     suppressed[j] = True
         keep = np.nonzero(suppressed == 0)[0]
         return keep
+    
