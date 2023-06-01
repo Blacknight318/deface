@@ -54,27 +54,27 @@ class CenterFace:
             raise ValueError(f"Invalid backend: {backend}")
 
     @staticmethod
-    def dynamicize_shapes(static_model):
-        from onnx.tools.update_model_dims import update_inputs_outputs_dims
+def dynamicize_shapes(static_model):
+    from onnx.tools.update_model_dims import update_inputs_outputs_dims
 
-        input_dims, output_dims = {}, {}
-        for node in static_model.graph.input:
-            dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
-            input_dims[node.name] = dims
-        for node in static_model.graph.output:
-            dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
-            output_dims[node.name] = dims
-        input_dims.update({
-            'input.1': ['B', 3, 'H', 'W']  # RGB input image
-        })
-        output_dims.update({
-            '537': ['B', 1, 'h', 'w'],  # heatmap
-            '538': ['B', 2, 'h', 'w'],  # scale
-            '539': ['B', 2, 'h', 'w'],  # offset
-            '540': ['B', 10, 'h', 'w']  # landmarks
-        })
-        dyn_model = update_inputs_outputs_dims(static_model, input_dims, output_dims)
-        return dyn_model
+    input_dims, output_dims = {}, {}
+    for node in static_model.graph.input:
+        dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
+        input_dims[node.name] = dims
+    for node in static_model.graph.output:
+        dims = [d.dim_value for d in node.type.tensor_type.shape.dim]
+        output_dims[node.name] = dims
+    input_dims.update({
+        'input.1': ['B', 3, 736, 1280]  # RGB input image with fixed dimensions
+    })
+    output_dims.update({
+        '537': ['B', 1, 'h', 'w'],  # heatmap
+        '538': ['B', 2, 'h', 'w'],  # scale
+        '539': ['B', 2, 'h', 'w'],  # offset
+        '540': ['B', 10, 'h', 'w']  # landmarks
+    })
+    dyn_model = update_inputs_outputs_dims(static_model, input_dims, output_dims)
+    return dyn_model
 
     def __call__(self, img, threshold=0.5):
         img = ensure_rgb(img)
