@@ -17,7 +17,7 @@ import cv2
 
 from deface import __version__
 # __version__ = 'a'
-from deface.centerface import CenterFace
+from deface.centerface_old import CenterFace
 
 
 # TODO: Optionally preserve audio track?
